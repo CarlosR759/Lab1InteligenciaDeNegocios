@@ -4,9 +4,24 @@ import pandas as pd
 connection = sqlite3.connect('github.db')
 cursor = connection.cursor()
 
-df = pd.read_csv('github.csv')
+df = pd.read_csv('githubRepos.csv')
+df = df.drop(columns=['Forks Count', 'Size (KB)']) #Drop useless columns
 
-print(df)
+#Create a column to add repo url //Data enrichment
+df['Repo URL'] = df.apply(lambda row: f"https://github.com/{row['Full Name']}", axis=1)
+print(df['Repo URL'])
+
+#We get a list of owners without duplication
+owners_fetch = df['Owner Login'].tolist()
+owners = df['Owner Login'].unique()
+print(owners.value_counts())
+#Debug lines:
+#owner_repetitions = df['Owner Login'].value_counts()
+#print(owners_fetch)
+#print(owner_repetitions) #This shows that a lot of organizations repeats in repos. Time to clean that.
+#print(owners)
+
+
 
 #save changes  and close
 connection.commit()
