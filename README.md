@@ -3,6 +3,8 @@
 
 #How to run github.py
 
+First you need to export github token to use the REST API. Export that first into your environment.
+
 
 ```
 uv init . 
