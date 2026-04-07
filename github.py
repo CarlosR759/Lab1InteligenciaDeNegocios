@@ -15,6 +15,17 @@ print(df['Repo URL'])
 owners_fetch = df['Owner Login'].tolist()
 owners = df['Owner Login'].unique()
 print(owners.value_counts())
+
+
+#Conversion of values into bool for incoming db insertion
+df['Has Wiki'] = df['Has Wiki'].astype(bool)
+df['Has Pages'] = df['Has Pages'].astype(bool)
+df['Has Projects'] = df['Has Projects'].astype(bool)
+df['Stars Count'] = df['Stars Count'].astype(int)
+df['Forks Count'] = df['Forks Count'].astype(int)
+df['Watchers Count'] = df['Watchers Count'].astype(int)
+df['Open Issues Count'] = df['Open Issues Count'].astype(int)
+
 #Debug lines:
 #owner_repetitions = df['Owner Login'].value_counts()
 #print(owners_fetch)
