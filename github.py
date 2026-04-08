@@ -1,4 +1,5 @@
 import sqlite3
+import time
 import pandas as pd
 import numpy as np
 import os
@@ -6,18 +7,23 @@ import requests
 
 
 token = os.environ.get('githubScraper')
+# print(token)
 
 connection = sqlite3.connect('github.db')
 cursor = connection.cursor()
 
 df = pd.read_csv('githubRepos.csv')
-df = df.drop(columns=['Forks Count', 'Size (KB)']) #Drop useless columns
+
+df = df.drop_duplicates(subset=['Full Name'], keep='first') #Drop duplicates based on owner/repository
+
+# df = df.drop(columns=['Forks Count', 'Size (KB)']) #Drop useless columns
+df = df.drop(columns=['Watchers Count', 'Size (KB)']) #Drop useless columns
 
 
 #We get a list of owners without duplication
 owners_fetch = df['Owner Login'].tolist()
 owners = df['Owner Login'].unique()
-print(owners.value_counts())
+# print(owners.value_counts())
 
 
 #Conversion of values into bool for incoming db insertion
@@ -25,8 +31,8 @@ df['Has Wiki'] = df['Has Wiki'].astype(bool)
 df['Has Pages'] = df['Has Pages'].astype(bool)
 df['Has Projects'] = df['Has Projects'].astype(bool)
 df['Stars Count'] = df['Stars Count'].astype(int)
-#df['Forks Count'] = df['Forks Count'].astype(int)
-df['Watchers Count'] = df['Watchers Count'].astype(int)
+df['Forks Count'] = df['Forks Count'].astype(int)
+# df['Watchers Count'] = df['Watchers Count'].astype(int)
 df['Open Issues Count'] = df['Open Issues Count'].astype(int)
 df = df[df['Default Branch'].isin(['main', 'master'])]
 #not_main_branches = df[~df['Default Branch'].isin(['main', 'master'])]
@@ -67,6 +73,42 @@ open_source_licenses = [
 
 df['Is Open Source'] = df['License'].apply(lambda x: x in open_source_licenses if pd.notnull(x) else False)
 
+#ratio used to track the conversion of stars into forks, to see how many people are interested in the project and how many actually use it.
+df['Conversion Rate'] = df.apply(lambda row: round((row['Forks Count'] / row['Stars Count']), 2) if row['Stars Count'] > 0 else 0, axis=1)
+
+########################DEV.to scraping#############################
+df['Dev.to Articles'] = np.nan #Init new column to add new data
+df['Dev.to Reactions'] = np.nan #Init new column to add new data
+def get_devto_impact(df):
+    # for index, row in df.iterrows():
+    for index, row in df.head(50).iterrows(): #Debug line, for complete scraping delete this and uncoment the previous one
+        repo_name = row['Repository Name']
+        valid_tag = repo_name.lower().replace(" ", "").replace(".", "").replace("-", "").replace("_", "")
+        api_url = f"https://dev.to/api/articles?tag={valid_tag}&per_page=1000"
+        api_url
+        try:
+            response = requests.get(api_url)
+            response.raise_for_status()
+            articles = response.json()
+            cant_articles = len(articles)
+
+            if cant_articles > 0:
+                total_reactions = sum(article['positive_reactions_count'] for article in articles)
+            else:
+                total_reactions = 0
+
+            df.at[index, 'Dev.to Articles'] = cant_articles if cant_articles > 0 else 0
+            df.at[index, 'Dev.to Reactions'] = total_reactions if total_reactions > 0 else 0
+
+            time.sleep(0.1)
+        except Exception as e:
+            print(f"Error fetching data for {repo_name}: {e}")
+
+    return df
+
+df = get_devto_impact(df)
+df['Dev.to Articles'] = df['Dev.to Articles'].fillna(0).astype(int)
+df['Dev.to Reactions'] = df['Dev.to Reactions'].fillna(0).astype(int)
 
 #Debug lines:
 #owner_repetitions = df['Owner Login'].value_counts()
@@ -76,10 +118,10 @@ df['Is Open Source'] = df['License'].apply(lambda x: x in open_source_licenses i
 #print(df[['Repository Name', 'Is Open Source']])
 
 ########################Github Scrapper#############################
-df['Top Contributor'] = np.nan #Init new column to add new data
+df['Top Contributor'] = None #Init new column to add new data
 def get_top_contributor(df, token):
-    for index, row in df.iterrows():
-    #for index, row in df.head(50).iterrows(): #Debug line, for complete scraping delete this and uncoment the previous one
+    # for index, row in df.iterrows():
+    for index, row in df.head(50).iterrows(): #Debug line, for complete scraping delete this and uncoment the previous one
         full_name = row['Full Name'] #Extraction of repo name to add in url
         api_url = f"https://api.github.com/repos/{full_name}/contributors"
 
@@ -96,8 +138,8 @@ def get_top_contributor(df, token):
 
     return  df
 
-df = get_top_contributor(token, df)
-print(df[['Repository Name', 'Top Contributor']])
+df = get_top_contributor(df, token)
+print(df[['Repository Name', 'Top Contributor', 'Dev.to Articles', 'Dev.to Reactions']].head(50))
 
 
 #save changes  and close for db
