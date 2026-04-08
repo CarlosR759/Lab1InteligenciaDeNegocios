@@ -118,28 +118,61 @@ df['Dev.to Reactions'] = df['Dev.to Reactions'].fillna(0).astype(int)
 #print(df[['Repository Name', 'Is Open Source']])
 
 ########################Github Scrapper#############################
+<<<<<<< Updated upstream
 df['Top Contributor'] = None #Init new column to add new data
 def get_top_contributor(df, token):
     # for index, row in df.iterrows():
     for index, row in df.head(50).iterrows(): #Debug line, for complete scraping delete this and uncoment the previous one
+=======
+df['Top Contributor'] = "" #Init new column to add new data
+def get_top_contributor(df, token):
+    #headers['Authorization'] = f'token {token}'
+    headers = {'Authorization': f'token {token}'}
+    #for index, row in df.iterrows():
+    for index, row in df.head(10).iterrows(): #Debug line, for complete scraping delete this and uncoment the previous one
+>>>>>>> Stashed changes
         full_name = row['Full Name'] #Extraction of repo name to add in url
         api_url = f"https://api.github.com/repos/{full_name}/contributors"
 
-        #Token inclusion into header file and request
-        headers = {}
-        headers['Authorization'] = f'token {token}'
-        response = requests.get(api_url, headers=headers)
-        response.raise_for_status()
-        contributors = response.json()
+        try:
+            #Token inclusion into header file and request
+            response = requests.get(api_url, headers=headers, timeout=30)
+            response.raise_for_status()
+            contributors = response.json()
+            # The API returns contributors sorted by number of commits (descending), so we pick the first one
+            top_contributor = contributors[0] if contributors else None
+            df.at[index, 'Top Contributor'] = top_contributor['login'] if top_contributor else None
+        except requests.exceptions.HTTPError as http_err:
+           if response.status_code == 404:
+               print(f"404 - Repo not found: {full_name}")
+               df.at[index, 'Top Contributor'] = None
+           elif response.status_code == 403:
+               print(f"404 -Access forbidden: {full_name}")
+               df.at[index, 'Top Contributor'] = None
+           else:
+               print(f"Maybe a Teapot buddy ? {full_name}: {http_err}")
+               df.at[index, 'Top Contributor'] = None
 
-        # The API returns contributors sorted by number of commits (descending), so we pick the first one
-        top_contributor = contributors[0] if contributors else None
-        df.at[index, 'Top Contributor'] = top_contributor['login'] if top_contributor else None
+        except requests.exceptions.ConnectionError:
+            print(f"Connection error for {full_name}")
+            df.at[index, 'Top Contributor'] = None
+        except requests.exceptions.Timeout:
+            print(f"Timeout for {full_name}")
+            df.at[index, 'Top Contributor'] = None
+        except Exception as err:
+            print(f"Unexpected error for {full_name}: {err}")
+            df.at[index, 'Top Contributor'] = None
 
     return  df
 
+<<<<<<< Updated upstream
 df = get_top_contributor(df, token)
 print(df[['Repository Name', 'Top Contributor', 'Dev.to Articles', 'Dev.to Reactions']].head(50))
+=======
+print(type(df))
+df = get_top_contributor(df, token)
+print(df[['Repository Name', 'Top Contributor']])
+>>>>>>> Stashed changes
 
 
 #save changes  and close for db
