@@ -1,5 +1,6 @@
 import sqlite3
 import pandas as pd
+import numpy as np
 import os
 import requests
 
@@ -74,13 +75,11 @@ df['Is Open Source'] = df['License'].apply(lambda x: x in open_source_licenses i
 #print(owners)
 #print(df[['Repository Name', 'Is Open Source']])
 
-
 ########################Github Scrapper#############################
+df['Top Contributor'] = np.nan #Init new column to add new data
 def get_top_contributor(df, token):
-
-    df['Top Contributor'] = None #init new column to add data
-    #for index, row in df.iterrows():
-    for index, row in df.head(50).iterrows(): #Debug line, for complete scraping delete this and uncoment the previous one
+    for index, row in df.iterrows():
+    #for index, row in df.head(50).iterrows(): #Debug line, for complete scraping delete this and uncoment the previous one
         full_name = row['Full Name'] #Extraction of repo name to add in url
         api_url = f"https://api.github.com/repos/{full_name}/contributors"
 
@@ -97,12 +96,12 @@ def get_top_contributor(df, token):
 
     return  df
 
-#df = get_top_contributor(repoWebLinks, token, df)
-#print(df[['Repository Name', 'Top Contributor']])
+df = get_top_contributor(token, df)
+print(df[['Repository Name', 'Top Contributor']])
 
 
 #save changes  and close for db
 connection.commit()
 connection.close()
 
-print(token)
+#print(token)
