@@ -118,19 +118,12 @@ df['Dev.to Reactions'] = df['Dev.to Reactions'].fillna(0).astype(int)
 #print(df[['Repository Name', 'Is Open Source']])
 
 ########################Github Scrapper#############################
-<<<<<<< Updated upstream
-df['Top Contributor'] = None #Init new column to add new data
-def get_top_contributor(df, token):
-    # for index, row in df.iterrows():
-    for index, row in df.head(50).iterrows(): #Debug line, for complete scraping delete this and uncoment the previous one
-=======
 df['Top Contributor'] = "" #Init new column to add new data
 def get_top_contributor(df, token):
     #headers['Authorization'] = f'token {token}'
     headers = {'Authorization': f'token {token}'}
     #for index, row in df.iterrows():
     for index, row in df.head(10).iterrows(): #Debug line, for complete scraping delete this and uncoment the previous one
->>>>>>> Stashed changes
         full_name = row['Full Name'] #Extraction of repo name to add in url
         api_url = f"https://api.github.com/repos/{full_name}/contributors"
 
@@ -165,14 +158,9 @@ def get_top_contributor(df, token):
 
     return  df
 
-<<<<<<< Updated upstream
-df = get_top_contributor(df, token)
-print(df[['Repository Name', 'Top Contributor', 'Dev.to Articles', 'Dev.to Reactions']].head(50))
-=======
 print(type(df))
 df = get_top_contributor(df, token)
 print(df[['Repository Name', 'Top Contributor']])
->>>>>>> Stashed changes
 
 
 #save changes  and close for db
