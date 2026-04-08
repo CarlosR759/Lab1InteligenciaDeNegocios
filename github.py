@@ -21,8 +21,8 @@ df = df.drop(columns=['Watchers Count', 'Size (KB)']) #Drop useless columns
 
 
 #We get a list of owners without duplication
-owners_fetch = df['Owner Login'].tolist()
-owners = df['Owner Login'].unique()
+# owners_fetch = df['Owner Login'].tolist()
+# owners = df['Owner Login'].unique()
 # print(owners.value_counts())
 
 
@@ -80,12 +80,11 @@ df['Conversion Rate'] = df.apply(lambda row: round((row['Forks Count'] / row['St
 df['Dev.to Articles'] = np.nan #Init new column to add new data
 df['Dev.to Reactions'] = np.nan #Init new column to add new data
 def get_devto_impact(df):
-    # for index, row in df.iterrows():
-    for index, row in df.head(50).iterrows(): #Debug line, for complete scraping delete this and uncoment the previous one
+    for index, row in df.iterrows():
+    # for index, row in df.head(10).iterrows(): #Debug line, for complete scraping delete this and uncoment the previous one
         repo_name = row['Repository Name']
         valid_tag = repo_name.lower().replace(" ", "").replace(".", "").replace("-", "").replace("_", "")
         api_url = f"https://dev.to/api/articles?tag={valid_tag}&per_page=1000"
-        api_url
         try:
             response = requests.get(api_url)
             response.raise_for_status()
@@ -103,6 +102,8 @@ def get_devto_impact(df):
             time.sleep(0.1)
         except Exception as e:
             print(f"Error fetching data for {repo_name}: {e}")
+            df.at[index, 'Dev.to Articles'] = 0
+            df.at[index, 'Dev.to Reactions'] = 0
 
     return df
 
@@ -122,8 +123,8 @@ df['Top Contributor'] = "" #Init new column to add new data
 def get_top_contributor(df, token):
     #headers['Authorization'] = f'token {token}'
     headers = {'Authorization': f'token {token}'}
-    #for index, row in df.iterrows():
-    for index, row in df.head(10).iterrows(): #Debug line, for complete scraping delete this and uncoment the previous one
+    for index, row in df.iterrows():
+    # for index, row in df.head(10).iterrows(): #Debug line, for complete scraping delete this and uncoment the previous one
         full_name = row['Full Name'] #Extraction of repo name to add in url
         api_url = f"https://api.github.com/repos/{full_name}/contributors"
 
@@ -140,7 +141,7 @@ def get_top_contributor(df, token):
                print(f"404 - Repo not found: {full_name}")
                df.at[index, 'Top Contributor'] = None
            elif response.status_code == 403:
-               print(f"404 -Access forbidden: {full_name}")
+               print(f"403 - Access forbidden: {full_name}")
                df.at[index, 'Top Contributor'] = None
            else:
                print(f"Maybe a Teapot buddy ? {full_name}: {http_err}")
@@ -158,10 +159,30 @@ def get_top_contributor(df, token):
 
     return  df
 
-print(type(df))
+# print(type(df))
 df = get_top_contributor(df, token)
-print(df[['Repository Name', 'Top Contributor']])
+# print(df[['Repository Name', 'Top Contributor']])
 
+#owners table
+df_owners = df[['Owner Login', 'Owner Type']].drop_duplicates()
+
+#number of repos by owner
+repos_count = df['Owner Login'].value_counts().reset_index()
+repos_count.columns = ['Owner Login', 'Total Repos']
+
+#merge the number of repos with the owners table, data enrichment
+df_owners = pd.merge(df_owners, repos_count, on='Owner Login', how='left')
+df_owners = df_owners.rename(columns={'Owner Login': 'owner_login', 'Owner Type': 'owner_type', 'Total Repos': 'total_repos'})
+
+#repos table
+df_repos = df.drop(columns=['Owner Type'])
+
+# print(df_owners.head(10))
+# print(df_repos.head(10))
+
+#insert data into db
+df_owners.to_sql('owners', connection, if_exists='replace', index=False)
+df_repos.to_sql('repositories', connection, if_exists='replace', index=False)
 
 #save changes  and close for db
 connection.commit()
