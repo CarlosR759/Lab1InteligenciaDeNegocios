@@ -14,7 +14,8 @@ cursor = connection.cursor()
 
 df = pd.read_csv('githubRepos.csv')
 
-df = df.drop_duplicates(subset=['Full Name'], keep='first') #Drop duplicates based on owner/repository
+# No longer using it in case of different branches, but it can be useful if we want to focus only on main/master branches
+# df = df.drop_duplicates(subset=['Full Name'], keep='first') #Drop duplicates based on owner/repository
 
 # df = df.drop(columns=['Forks Count', 'Size (KB)']) #Drop useless columns
 df = df.drop(columns=['Watchers Count', 'Size (KB)']) #Drop useless columns
@@ -172,13 +173,60 @@ repos_count.columns = ['Owner Login', 'Total Repos']
 
 #merge the number of repos with the owners table, data enrichment
 df_owners = pd.merge(df_owners, repos_count, on='Owner Login', how='left')
-df_owners = df_owners.rename(columns={'Owner Login': 'owner_login', 'Owner Type': 'owner_type', 'Total Repos': 'total_repos'})
+df_owners.columns = df_owners.columns.str.lower().str.replace(' ', '_')
 
 #repos table
 df_repos = df.drop(columns=['Owner Type'])
+df_repos.columns = df_repos.columns.str.lower().str.replace(' ', '_').str.replace('.', '')
 
 # print(df_owners.head(10))
 # print(df_repos.head(10))
+
+#drop tables if they exist to avoid errors when creating them again, this is useful for development, but in production we should use migrations to avoid data loss
+cursor.execute("PRAGMA foreign_keys = ON;") #Enable foreign keys for db
+cursor.execute("DROP TABLE IF EXISTS repositories;")
+cursor.execute("DROP TABLE IF EXISTS owners;")
+
+#create owners table, PK owner_login
+cursor.execute("""
+CREATE TABLE owners (
+    owner_login TEXT PRIMARY KEY,
+    owner_type TEXT,
+    total_repos INTEGER
+);
+""")
+
+#create repositories table, PK full_name, FK owner_login
+cursor.execute("""
+CREATE TABLE repositories (
+    domain TEXT,
+    repository_name TEXT,
+    full_name TEXT PRIMARY KEY,
+    description TEXT,
+    primary_language TEXT,
+    stars_count INTEGER,
+    forks_count INTEGER,
+    open_issues_count INTEGER,
+    has_wiki BOOLEAN,
+    has_pages BOOLEAN,
+    has_projects BOOLEAN,
+    created_at TEXT,
+    updated_at TEXT,
+    pushed_at TEXT,
+    default_branch TEXT,
+    owner_login TEXT,
+    license TEXT,
+    topics TEXT,
+    repo_url TEXT,
+    is_open_source BOOLEAN,
+    conversion_rate REAL,
+    devto_articles INTEGER,
+    devto_reactions INTEGER,
+    top_contributor TEXT,
+    FOREIGN KEY(owner_login) REFERENCES owners(owner_login)
+);
+""")
+
 
 #insert data into db
 df_owners.to_sql('owners', connection, if_exists='replace', index=False)
