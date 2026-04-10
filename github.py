@@ -7,24 +7,14 @@ import requests
 
 
 token = os.environ.get('githubScraper')
-# print(token)
 
 connection = sqlite3.connect('github.db')
 cursor = connection.cursor()
 
 df = pd.read_csv('githubRepos.csv')
 
-# No longer using it in case of different branches, but it can be useful if we want to focus only on main/master branches
-# df = df.drop_duplicates(subset=['Full Name'], keep='first') #Drop duplicates based on owner/repository
 
-# df = df.drop(columns=['Forks Count', 'Size (KB)']) #Drop useless columns
 df = df.drop(columns=['Watchers Count', 'Size (KB)']) #Drop useless columns
-
-
-#We get a list of owners without duplication
-# owners_fetch = df['Owner Login'].tolist()
-# owners = df['Owner Login'].unique()
-# print(owners.value_counts())
 
 
 #Conversion of values into bool for incoming db insertion
@@ -33,20 +23,12 @@ df['Has Pages'] = df['Has Pages'].astype(bool)
 df['Has Projects'] = df['Has Projects'].astype(bool)
 df['Stars Count'] = df['Stars Count'].astype(int)
 df['Forks Count'] = df['Forks Count'].astype(int)
-# df['Watchers Count'] = df['Watchers Count'].astype(int)
 df['Open Issues Count'] = df['Open Issues Count'].astype(int)
 df = df[df['Default Branch'].isin(['main', 'master'])]
-#not_main_branches = df[~df['Default Branch'].isin(['main', 'master'])]
-#print(not_main_branches[['Repository Name', 'Default Branch']])
 
 
 #Create a column to add repo url //Data enrichment
 df['Repo URL'] = df.apply(lambda row: f"https://github.com/{row['Full Name']}", axis=1)
-#print(df['Repo URL'])
-
-
-#licenses = df['License'].unique()
-#print(licenses)
 
 #List of open source licences to make boolean column for each repo
 open_source_licenses = [
@@ -82,7 +64,6 @@ df['Dev.to Articles'] = np.nan #Init new column to add new data
 df['Dev.to Reactions'] = np.nan #Init new column to add new data
 def get_devto_impact(df):
     for index, row in df.iterrows():
-    # for index, row in df.head(10).iterrows(): #Debug line, for complete scraping delete this and uncoment the previous one
         repo_name = row['Repository Name']
         valid_tag = repo_name.lower().replace(" ", "").replace(".", "").replace("-", "").replace("_", "")
         api_url = f"https://dev.to/api/articles?tag={valid_tag}&per_page=1000"
@@ -112,20 +93,12 @@ df = get_devto_impact(df)
 df['Dev.to Articles'] = df['Dev.to Articles'].fillna(0).astype(int)
 df['Dev.to Reactions'] = df['Dev.to Reactions'].fillna(0).astype(int)
 
-#Debug lines:
-#owner_repetitions = df['Owner Login'].value_counts()
-#print(owners_fetch)
-#print(owner_repetitions) #This shows that a lot of organizations repeats in repos. Time to clean that.
-#print(owners)
-#print(df[['Repository Name', 'Is Open Source']])
 
 ########################Github Scrapper#############################
 df['Top Contributor'] = "" #Init new column to add new data
 def get_top_contributor(df, token):
-    #headers['Authorization'] = f'token {token}'
     headers = {'Authorization': f'token {token}'}
     for index, row in df.iterrows():
-    # for index, row in df.head(10).iterrows(): #Debug line, for complete scraping delete this and uncoment the previous one
         full_name = row['Full Name'] #Extraction of repo name to add in url
         api_url = f"https://api.github.com/repos/{full_name}/contributors"
 
@@ -160,9 +133,7 @@ def get_top_contributor(df, token):
 
     return  df
 
-# print(type(df))
 df = get_top_contributor(df, token)
-# print(df[['Repository Name', 'Top Contributor']])
 
 #owners table
 df_owners = df[['Owner Login', 'Owner Type']].drop_duplicates()
@@ -179,8 +150,6 @@ df_owners.columns = df_owners.columns.str.lower().str.replace(' ', '_')
 df_repos = df.drop(columns=['Owner Type'])
 df_repos.columns = df_repos.columns.str.lower().str.replace(' ', '_').str.replace('.', '')
 
-# print(df_owners.head(10))
-# print(df_repos.head(10))
 
 #drop tables if they exist to avoid errors when creating them again, this is useful for development, but in production we should use migrations to avoid data loss
 cursor.execute("PRAGMA foreign_keys = ON;") #Enable foreign keys for db
@@ -235,5 +204,3 @@ df_repos.to_sql('repositories', connection, if_exists='replace', index=False)
 #save changes  and close for db
 connection.commit()
 connection.close()
-
-#print(token)
